@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CarPlay Moto Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CarPlay">
+  <meta name="theme-color" content="#000000">
+
+  <!-- Leaflet CSS for Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+      background-color: #000000;
+      color: #ffffff;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* CARPLAY LEFT DOCK */
+    #dock {
+      width: 68px;
+      height: 100%;
+      background: rgba(22, 22, 24, 0.95);
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      z-index: 1000;
+    }
+
+    .dock-top {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .dock-clock {
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      letter-spacing: -0.2px;
+    }
+
+    .dock-status-icons {
+      display: flex;
+      gap: 4px;
+      font-size: 10px;
+      color: #30d158;
+    }
+
+    .dock-apps {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .dock-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .dock-btn:active {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(0.92);
+    }
+
+    .dock-btn.active {
+      background: #007aff;
+      border-color: #5ac8fa;
+    }
+
+    .dock-btn svg {
+      width: 26px;
+      height: 26px;
+      fill: #ffffff;
+    }
+
+    .dock-bottom {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dock-home-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: transparent;
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .dock-home-btn:active {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .dock-home-btn-inner {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 2px solid rgba(255, 255, 255, 0.8);
+    }
+
+    /* MAIN VIEWPORT */
+    #viewport {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      background: #000;
+    }
+
+    /* DASHBOARD SPLIT VIEW */
+    .view-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: none;
+    }
+
+    .view-container.active {
+      display: flex;
+    }
+
+    #view-dashboard {
+      padding: 10px;
+      gap: 12px;
+    }
+
+    /* MAP CARD (LEFT SIDE) */
+    .map-pane {
+      flex: 1.25;
+      height: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      position: relative;
+      background: #1c1c1e;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #111;
+    }
+
+    /* NAVIGATION BANNER OVER MAP */
+    .nav-banner {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background: rgba(28, 28, 30, 0.94);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 14px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 500;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    }
+
+    .nav-banner-icon {
+      width: 38px;
+      height: 38px;
+      background: #30d158;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-banner-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: #ffffff;
+    }
+
+    .nav-banner-details {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .nav-banner-distance {
+      font-size: 18px;
+      font-weight: 700;
+      color: #30d158;
+    }
+
+    .nav-banner-street {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .map-controls-floating {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 500;
+    }
+
+    .map-float-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: rgba(28, 28, 30, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .map-float-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: #ffffff;
+    }
+
+    /* RIGHT WIDGETS COLUMN */
+    .widgets-pane {
+      flex: 0.95;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* CARD 1: SPEEDOMETER & TRIP */
+    .card-speed {
+      flex: 1;
+      background: rgba(28, 28, 30, 0.92);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      position: relative;
+    }
+
+    .speed-display {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .speed-value {
+      font-size: 58px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .speed-unit {
+      font-size: 16px;
+      font-weight: 600;
+      color: #8e8e93;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .speed-subinfo {
+      text-align: right;
+    }
+
+    .speed-subinfo .sub-label {
+      font-size: 11px;
+      color: #8e8e93;
+      text-transform: uppercase;
+    }
+
+    .speed-subinfo .sub-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #30d158;
+    }
+
+    /* CARD 2: MUSIC & MEDIA (GLOVE-FRIENDLY BUTTONS) */
+    .card-music {
+      flex: 1.1;
+      background: rgba(28, 28, 30, 0.92);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px 14px;
+    }
+
+    .music-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .music-art {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #fa2d48, #af2896);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .music-art svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+    }
+
+    .music-meta {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .music-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .music-artist {
+      font-size: 12px;
+      color: #8e8e93;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* BIG GLOVE TOUCH CONTROLS */
+    .music-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      margin-top: 4px;
+    }
+
+    .glove-btn {
+      width: 58px;
+      height: 52px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.1s, transform 0.1s;
+    }
+
+    .glove-btn:active {
+      background: rgba(255, 255, 255, 0.35);
+      transform: scale(0.92);
+    }
+
+    .glove-btn svg {
+      width: 26px;
+      height: 26px;
+      fill: #ffffff;
+    }
+
+    .glove-btn-primary {
+      width: 66px;
+      height: 54px;
+      background: #007aff;
+      border-color: #5ac8fa;
+    }
+
+    .glove-btn-primary:active {
+      background: #0051a8;
+    }
+
+    /* CARD 3: QUICK CONTROLS */
+    .card-actions {
+      flex: 0.9;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .action-tile {
+      background: rgba(28, 28, 30, 0.92);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .action-tile:active {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .action-tile svg {
+      width: 22px;
+      height: 22px;
+      fill: #ffffff;
+    }
+
+    .action-tile span {
+      font-size: 11px;
+      font-weight: 500;
+      color: #8e8e93;
+    }
+
+    /* APP LAUNCHER / DRAWER VIEW */
+    #view-apps {
+      padding: 24px;
+      display: none;
+      flex-direction: column;
+      background: #000;
+    }
+
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      padding: 10px;
+    }
+
+    .app-icon-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .app-icon-box {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .app-icon-box svg {
+      width: 40px;
+      height: 40px;
+      fill: #ffffff;
+    }
+
+    .app-icon-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #fff;
+    }
+
+    /* SEARCH / ROUTING MODAL */
+    #search-modal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      -webkit-backdrop-filter: blur(15px);
+      backdrop-filter: blur(15px);
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+      padding: 20px 40px;
+    }
+
+    .search-bar-wrap {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .search-input {
+      flex: 1;
+      height: 52px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(28, 28, 30, 0.95);
+      color: #fff;
+      font-size: 18px;
+      padding: 0 16px;
+      outline: none;
+    }
+
+    .search-btn-close {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: #ff453a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .search-presets {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .preset-chip {
+      padding: 8px 16px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .search-results {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .result-row {
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(28, 28, 30, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+    }
+
+    .result-row:active {
+      background: #007aff;
+    }
+
+    .result-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .result-desc {
+      font-size: 12px;
+      color: #8e8e93;
+    }
+
+    /* HIGH CONTRAST DAY MODE */
+    body.day-mode {
+      background: #f2f2f7;
+      color: #000;
+    }
+
+    body.day-mode #dock {
+      background: rgba(240, 240, 245, 0.95);
+      border-right-color: rgba(0, 0, 0, 0.15);
+    }
+
+    body.day-mode .dock-clock {
+      color: #000;
+    }
+
+    body.day-mode .dock-btn {
+      background: rgba(0, 0, 0, 0.08);
+      border-color: rgba(0, 0, 0, 0.12);
+    }
+
+    body.day-mode .dock-btn svg {
+      fill: #000;
+    }
+
+    body.day-mode .dock-btn.active svg {
+      fill: #fff;
+    }
+
+    body.day-mode .card-speed,
+    body.day-mode .card-music,
+    body.day-mode .action-tile,
+    body.day-mode .nav-banner {
+      background: rgba(255, 255, 255, 0.95);
+      border-color: rgba(0, 0, 0, 0.12);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    body.day-mode .speed-value,
+    body.day-mode .music-title,
+    body.day-mode .nav-banner-street {
+      color: #000;
+    }
+
+    body.day-mode .glove-btn {
+      background: rgba(0, 0, 0, 0.08);
+      border-color: rgba(0, 0, 0, 0.15);
+    }
+
+    body.day-mode .glove-btn svg {
+      fill: #000;
+    }
+
+    body.day-mode .glove-btn-primary svg {
+      fill: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HIDDEN NO-SLEEP VIDEO (KEEPS IPHONE SCREEN AWAKE WHILE RIDING) -->
+  <video id="no-sleep-video" playsinline muted loop style="position:fixed;width:1px;height:1px;top:-10px;opacity:0.01;">
+    <source src="data:video/mp4;base64,AAAAHGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQAAABBtb292AAAAbG12aGQAAAAA11P7e9dT+3sAAAPoAAAAAAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAGXRyYWsAAABZdGtoZAAAAAHXU/t711P7ewAAAAEAAAAAAAAPoAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAbWRpYQAAACRtaGRoAAAAANdT+3vXU/t7AAAPoAAAAABleGgAAAAAAC1oZGxyAAAAAAAAAAB2aWRlAAAAAAAAAAAAAAAAVmlkZW9IYW5kbGVyAAAAAAFXbWluZgAAABR2bWhkAAAAAQAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADGRybm8AAAABAAAAY3N0YmwAAABTc3RzZAAAAAAAAAABAAAAR2F2YzEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAQAQAEgAAABIAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY//8AAAAxYXZjQwH0ABv/4QAcZ/QAG+YGBzY2NkAALu4BAQAAAwAEAAADwA8AAAAdYAAAAAAAEHN0dHMAAAAAAAAAAAAAAAA=" type="video/mp4">
+  </video>
+
+  <!-- CARPLAY LEFT DOCK -->
+  <aside id="dock">
+    <div class="dock-top">
+      <div class="dock-clock" id="dock-time">12:00</div>
+      <div class="dock-status-icons">
+        <span>●●●</span>
+      </div>
+    </div>
+
+    <div class="dock-apps">
+      <!-- DASHBOARD / SPLIT VIEW -->
+      <button class="dock-btn active" id="btn-dock-dashboard" title="Dashboard">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm9 0h7v7h-7v-7z"/>
+        </svg>
+      </button>
+
+      <!-- FULLSCREEN MAP -->
+      <button class="dock-btn" id="btn-dock-map" title="Navigation">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      </button>
+
+      <!-- MUSIC / MEDIA -->
+      <button class="dock-btn" id="btn-dock-music" title="Music">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+      </button>
+
+      <!-- APP LAUNCHER -->
+      <button class="dock-btn" id="btn-dock-apps" title="All Apps">
+        <svg viewBox="0 0 24 24">
+          <circle cx="6" cy="6" r="2.5"/><circle cx="12" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/>
+          <circle cx="6" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="18" cy="12" r="2.5"/>
+          <circle cx="6" cy="18" r="2.5"/><circle cx="12" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="dock-bottom">
+      <button class="dock-home-btn" id="btn-dock-home">
+        <div class="dock-home-btn-inner"></div>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEWPORT -->
+  <main id="viewport">
+
+    <!-- VIEW 1: CARPLAY SPLIT DASHBOARD -->
+    <section class="view-container active" id="view-dashboard">
+      <!-- LEFT: INTERACTIVE MAP -->
+      <div class="map-pane">
+        <div id="map"></div>
+
+        <!-- TURN-BY-TURN GUIDANCE BANNER -->
+        <div class="nav-banner" id="nav-banner" style="display:none;">
+          <div class="nav-banner-icon">
+            <svg id="nav-icon" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+          </div>
+          <div class="nav-banner-details">
+            <div class="nav-banner-distance" id="nav-distance">500 m</div>
+            <div class="nav-banner-street" id="nav-street">Continue along route</div>
+          </div>
+          <button class="glove-btn" id="btn-cancel-route" style="width:42px;height:42px;background:#ff453a;border:none;">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+        </div>
+
+        <!-- FLOATING MAP CONTROLS -->
+        <div class="map-controls-floating">
+          <button class="map-float-btn" id="btn-recenter" title="Re-center GPS">
+            <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-7-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+          </button>
+          <button class="map-float-btn" id="btn-search-dest" title="Search Destination">
+            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: SPEEDOMETER, MEDIA & ACTIONS -->
+      <div class="widgets-pane">
+        <!-- CARD 1: SPEEDOMETER -->
+        <div class="card-speed">
+          <div class="speed-display">
+            <span class="speed-value" id="val-speed">0</span>
+            <span class="speed-unit" id="btn-toggle-unit">km/h</span>
+          </div>
+          <div class="speed-subinfo">
+            <div class="sub-label">GPS Altitude</div>
+            <div class="sub-value" id="val-altitude">-- m</div>
+            <div class="sub-label" style="margin-top:4px;">Heading</div>
+            <div class="sub-value" id="val-heading">N</div>
+          </div>
+        </div>
+
+        <!-- CARD 2: GLOVE-FRIENDLY MUSIC CONTROLS -->
+        <div class="card-music">
+          <div class="music-header">
+            <div class="music-art">
+              <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            </div>
+            <div class="music-meta">
+              <div class="music-title" id="music-title">Road Ride Mix</div>
+              <div class="music-artist" id="music-artist">Internet Stream / Motorcycle</div>
+            </div>
+          </div>
+          <div class="music-controls">
+            <button class="glove-btn" id="btn-music-prev">
+              <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button class="glove-btn glove-btn-primary" id="btn-music-play">
+              <svg id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="glove-btn" id="btn-music-next">
+              <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- CARD 3: QUICK ACTIONS -->
+        <div class="card-actions">
+          <div class="action-tile" id="btn-action-contrast">
+            <svg viewBox="0 0 24 24"><path d="M20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+            <span>Contrast</span>
+          </div>
+          <div class="action-tile" id="btn-action-spotify">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.58 14.42c-.18.3-.56.4-.86.22-2.36-1.44-5.33-1.77-8.83-.97-.34.08-.68-.13-.76-.47-.08-.34.13-.68.47-.76 3.83-.87 7.12-.5 9.76 1.12.3.18.4.56.22.86zm1.22-2.72c-.23.37-.71.49-1.08.26-2.7-1.66-6.82-2.14-10.02-1.17-.42.13-.86-.11-.99-.53-.13-.42.11-.86.53-.99 3.65-1.11 8.2-.57 11.3 1.35.37.23.49.71.26 1.08zm.11-2.84C14.67 8.87 9.33 8.69 6.25 9.63c-.49.15-1.01-.13-1.16-.62-.15-.49.13-1.01.62-1.16 3.56-1.08 9.47-.87 13.24 1.36.45.27.6.85.33 1.3-.27.45-.85.6-1.3.33z"/></svg>
+            <span>Spotify</span>
+          </div>
+          <div class="action-tile" id="btn-action-apple-maps">
+            <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+            <span>Maps</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: APP LAUNCHER / DRAWER -->
+    <section class="view-container" id="view-apps">
+      <div class="apps-grid">
+        <div class="app-icon-item" onclick="window.location.href='maps://';">
+          <div class="app-icon-box" style="background:#34c759;">
+            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          </div>
+          <div class="app-icon-label">Apple Maps</div>
+        </div>
+
+        <div class="app-icon-item" onclick="window.location.href='comgooglemaps://';">
+          <div class="app-icon-box" style="background:#4285f4;">
+            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          </div>
+          <div class="app-icon-label">Google Maps</div>
+        </div>
+
+        <div class="app-icon-item" onclick="window.location.href='spotify://';">
+          <div class="app-icon-box" style="background:#1db954;">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.58 14.42c-.18.3-.56.4-.86.22-2.36-1.44-5.33-1.77-8.83-.97-.34.08-.68-.13-.76-.47-.08-.34.13-.68.47-.76 3.83-.87 7.12-.5 9.76 1.12.3.18.4.56.22.86zm1.22-2.72c-.23.37-.71.49-1.08.26-2.7-1.66-6.82-2.14-10.02-1.17-.42.13-.86-.11-.99-.53-.13-.42.11-.86.53-.99 3.65-1.11 8.2-.57 11.3 1.35.37.23.49.71.26 1.08zm.11-2.84C14.67 8.87 9.33 8.69 6.25 9.63c-.49.15-1.01-.13-1.16-.62-.15-.49.13-1.01.62-1.16 3.56-1.08 9.47-.87 13.24 1.36.45.27.6.85.33 1.3-.27.45-.85.6-1.3.33z"/></svg>
+          </div>
+          <div class="app-icon-label">Spotify</div>
+        </div>
+
+        <div class="app-icon-item" onclick="window.location.href='music://';">
+          <div class="app-icon-box" style="background:#fa2d48;">
+            <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+          <div class="app-icon-label">Apple Music</div>
+        </div>
+
+        <div class="app-icon-item" onclick="window.location.href='tel://';">
+          <div class="app-icon-box" style="background:#30d158;">
+            <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+          </div>
+          <div class="app-icon-label">Phone</div>
+        </div>
+
+        <div class="app-icon-item" id="app-item-dashboard">
+          <div class="app-icon-box" style="background:#5856d6;">
+            <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm9 0h7v7h-7v-7z"/></svg>
+          </div>
+          <div class="app-icon-label">Dashboard</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SEARCH & ROUTING MODAL -->
+    <div id="search-modal">
+      <div class="search-bar-wrap">
+        <input type="text" class="search-input" id="search-query" placeholder="Enter destination..." autocomplete="off">
+        <button class="search-btn-close" id="btn-close-search">
+          <svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:#fff;"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+      <div class="search-presets">
+        <div class="preset-chip" onclick="searchPreset('Gas Station')">⛽ Petrol / Gas</div>
+        <div class="preset-chip" onclick="searchPreset('Cafe')">☕ Coffee / Food</div>
+        <div class="preset-chip" onclick="searchPreset('Hospital')">🏥 Hospital</div>
+      </div>
+      <div class="search-results" id="search-results-list"></div>
+    </div>
+
+  </main>
+
+  <!-- Leaflet JS for Map -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // COMPATIBLE JAVASCRIPT (ES5/ES6 without ?. or ?? for iOS 12 compatibility)
+    var isMph = false;
+    var currentSpeedKmh = 0;
+    var currentHeading = 0;
+    var userLat = null;
+    var userLng = null;
+    var followUser = true;
+    var map = null;
+    var userMarker = null;
+    var routeLayer = null;
+    var isDayMode = false;
+    var navigationActive = false;
+
+    // Web Audio Radio Streams for Riding
+    var radioStations = [
+      { title: "Synthwave / Chill Ride", artist: "Nightride FM", url: "https://stream.nightride.fm/chill.m4a" },
+      { title: "Cyberpunk / Fast Tempo", artist: "Nightride FM", url: "https://stream.nightride.fm/nightride.m4a" },
+      { title: "Lo-Fi Beats", artist: "Lofi Live", url: "https://play.streamafrica.net/lofiradio" }
+    ];
+    var currentStationIdx = 0;
+    var audio = new Audio();
+    var isPlaying = false;
+
+    // 1. CLOCK UPDATE
+    function updateClock() {
+      var now = new Date();
+      var hours = now.getHours();
+      var minutes = now.getMinutes();
+      var strTime = (hours < 10 ? '0' : '') + hours + ':' + (minutes < 10 ? '0' : '') + minutes;
+      document.getElementById('dock-time').textContent = strTime;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // 2. KEEP SCREEN AWAKE (NO-SLEEP TRICK FOR SAFARI)
+    function enableScreenAwake() {
+      var video = document.getElementById('no-sleep-video');
+      if (video) {
+        video.play().catch(function() {});
+      }
+    }
+    document.addEventListener('touchstart', enableScreenAwake, { once: true });
+    document.addEventListener('click', enableScreenAwake, { once: true });
+
+    // 3. INITIALIZE LEAFLET MAP
+    function initMap() {
+      // Default center
+      map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([12.9716, 77.5946], 15);
+
+      // CartoDB Dark Matter Tiles (Night/Standard)
+      var darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd'
+      }).addTo(map);
+
+      // Custom User Location Pin with Pulsing Effect
+      var pinHtml = '<div style="width:20px;height:20px;background:#007aff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 10px #007aff;"></div>';
+      var userIcon = L.divIcon({
+        className: 'user-pos-icon',
+        html: pinHtml,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      userMarker = L.marker([12.9716, 77.5946], { icon: userIcon }).addTo(map);
+
+      map.on('dragstart', function() {
+        followUser = false;
+      });
+    }
+
+    // 4. GPS TRACKING & SPEEDOMETER
+    function initGeolocation() {
+      if (!navigator.geolocation) {
+        console.warn("Geolocation not supported.");
+        return;
+      }
+
+      navigator.geolocation.watchPosition(
+        function(pos) {
+          userLat = pos.coords.latitude;
+          userLng = pos.coords.longitude;
+
+          // Speed in km/h
+          var speedMs = pos.coords.speed;
+          if (speedMs !== null && speedMs >= 0) {
+            currentSpeedKmh = Math.round(speedMs * 3.6);
+          } else {
+            currentSpeedKmh = 0;
+          }
+
+          updateSpeedometer();
+
+          // Altitude
+          if (pos.coords.altitude !== null) {
+            document.getElementById('val-altitude').textContent = Math.round(pos.coords.altitude) + " m";
+          }
+
+          // Heading
+          if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) {
+            currentHeading = Math.round(pos.coords.heading);
+            document.getElementById('val-heading').textContent = getCompassDirection(currentHeading);
+          }
+
+          // Update Map Marker
+          if (userMarker) {
+            userMarker.setLatLng([userLat, userLng]);
+            if (followUser && map) {
+              map.setView([userLat, userLng], 16);
+            }
+          }
+        },
+        function(err) {
+          console.warn("GPS error: " + err.message);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 500,
+          timeout: 5000
+        }
+      );
+    }
+
+    function updateSpeedometer() {
+      var displaySpeed = currentSpeedKmh;
+      if (isMph) {
+        displaySpeed = Math.round(currentSpeedKmh * 0.621371);
+      }
+      document.getElementById('val-speed').textContent = displaySpeed;
+    }
+
+    function getCompassDirection(deg) {
+      var directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+      var index = Math.round(((deg % 360) / 45)) % 8;
+      return directions[index] + " " + deg + "°";
+    }
+
+    // Unit toggle (km/h vs mph)
+    document.getElementById('btn-toggle-unit').addEventListener('click', function() {
+      isMph = !isMph;
+      this.textContent = isMph ? "mph" : "km/h";
+      updateSpeedometer();
+    });
+
+    // Re-center GPS
+    document.getElementById('btn-recenter').addEventListener('click', function() {
+      followUser = true;
+      if (userLat !== null && userLng !== null && map) {
+        map.setView([userLat, userLng], 17);
+      }
+    });
+
+    // 5. TURN-BY-TURN ROUTING VIA OPEN SOURCE ROUTING MACHINE (OSRM)
+    function searchPreset(term) {
+      document.getElementById('search-query').value = term;
+      executeSearch(term);
+    }
+
+    function executeSearch(query) {
+      if (!query || query.trim().length === 0) return;
+      var resultsContainer = document.getElementById('search-results-list');
+      resultsContainer.innerHTML = '<div style="color:#8e8e93;padding:12px;">Searching locations...</div>';
+
+      var nearParam = "";
+      if (userLat && userLng) {
+        nearParam = "&viewbox=" + (userLng - 0.5) + "," + (userLat + 0.5) + "," + (userLng + 0.5) + "," + (userLat - 0.5);
+      }
+
+      var url = "https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(query) + nearParam + "&limit=5";
+
+      fetch(url)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          resultsContainer.innerHTML = "";
+          if (data.length === 0) {
+            resultsContainer.innerHTML = '<div style="color:#8e8e93;padding:12px;">No results found.</div>';
+            return;
+          }
+          data.forEach(function(item) {
+            var row = document.createElement('div');
+            row.className = 'result-row';
+            row.innerHTML = '<div class="result-name">' + (item.display_name.split(',')[0]) + '</div><div class="result-desc">' + item.display_name + '</div>';
+            row.addEventListener('click', function() {
+              selectDestination(parseFloat(item.lat), parseFloat(item.lon), item.display_name.split(',')[0]);
+            });
+            resultsContainer.appendChild(row);
+          });
+        })
+        .catch(function(err) {
+          resultsContainer.innerHTML = '<div style="color:#ff453a;padding:12px;">Search failed. Check hotspot internet.</div>';
+        });
+    }
+
+    document.getElementById('search-query').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        executeSearch(this.value);
+      }
+    });
+
+    function selectDestination(destLat, destLon, name) {
+      document.getElementById('search-modal').style.display = 'none';
+
+      if (!userLat || !userLng) {
+        alert("Waiting for GPS location...");
+        return;
+      }
+
+      // Fetch route from OSRM
+      var routeUrl = "https://router.project-osrm.org/route/v1/driving/" + userLng + "," + userLat + ";" + destLon + "," + destLat + "?overview=full&geometries=geojson&steps=true";
+
+      fetch(routeUrl)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (!data.routes || data.routes.length === 0) {
+            alert("No road route found.");
+            return;
+          }
+
+          var route = data.routes[0];
+          var coords = route.geometry.coordinates.map(function(pt) {
+            return [pt[1], pt[0]];
+          });
+
+          if (routeLayer) {
+            map.removeLayer(routeLayer);
+          }
+
+          routeLayer = L.polyline(coords, {
+            color: '#007aff',
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(map);
+
+          map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+
+          // Show guidance banner
+          document.getElementById('nav-banner').style.display = 'flex';
+          var distKm = (route.distance / 1000).toFixed(1);
+          document.getElementById('nav-distance').textContent = distKm + " km";
+          document.getElementById('nav-street').textContent = "Route to " + name;
+
+          navigationActive = true;
+          followUser = true;
+        })
+        .catch(function(err) {
+          alert("Could not calculate route. Ensure iPhone 14 Pro hotspot is active.");
+        });
+    }
+
+    document.getElementById('btn-cancel-route').addEventListener('click', function() {
+      if (routeLayer) {
+        map.removeLayer(routeLayer);
+        routeLayer = null;
+      }
+      document.getElementById('nav-banner').style.display = 'none';
+      navigationActive = false;
+    });
+
+    document.getElementById('btn-search-dest').addEventListener('click', function() {
+      document.getElementById('search-modal').style.display = 'flex';
+      document.getElementById('search-query').focus();
+    });
+
+    document.getElementById('btn-close-search').addEventListener('click', function() {
+      document.getElementById('search-modal').style.display = 'none';
+    });
+
+    // 6. GLOVE-FRIENDLY MUSIC / STREAMING RADIO PLAYER
+    function loadStation(idx) {
+      currentStationIdx = (idx + radioStations.length) % radioStations.length;
+      var station = radioStations[currentStationIdx];
+      document.getElementById('music-title').textContent = station.title;
+      document.getElementById('music-artist').textContent = station.artist;
+      audio.src = station.url;
+      if (isPlaying) {
+        audio.play().catch(function() {});
+      }
+    }
+
+    var btnPlay = document.getElementById('btn-music-play');
+    btnPlay.addEventListener('click', function() {
+      if (!audio.src) {
+        loadStation(0);
+      }
+      if (isPlaying) {
+        audio.pause();
+        isPlaying = false;
+        document.getElementById('icon-play').innerHTML = '<path d="M8 5v14l11-7z"/>';
+      } else {
+        audio.play().catch(function() {});
+        isPlaying = true;
+        document.getElementById('icon-play').innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      }
+    });
+
+    document.getElementById('btn-music-next').addEventListener('click', function() {
+      loadStation(currentStationIdx + 1);
+    });
+
+    document.getElementById('btn-music-prev').addEventListener('click', function() {
+      loadStation(currentStationIdx - 1);
+    });
+
+    // 7. HIGH CONTRAST / DAYLIGHT MODE
+    document.getElementById('btn-action-contrast').addEventListener('click', function() {
+      isDayMode = !isDayMode;
+      if (isDayMode) {
+        document.body.classList.add('day-mode');
+      } else {
+        document.body.classList.remove('day-mode');
+      }
+    });
+
+    // 8. DEEP LINKS FOR APPS
+    document.getElementById('btn-action-spotify').addEventListener('click', function() {
+      window.location.href = 'spotify://';
+    });
+    document.getElementById('btn-action-apple-maps').addEventListener('click', function() {
+      window.location.href = 'maps://';
+    });
+
+    // 9. DOCK NAVIGATION
+    function switchView(viewId) {
+      document.querySelectorAll('.view-container').forEach(function(el) {
+        el.classList.remove('active');
+      });
+      document.querySelectorAll('.dock-btn').forEach(function(el) {
+        el.classList.remove('active');
+      });
+      document.getElementById(viewId).classList.add('active');
+
+      if (viewId === 'view-dashboard') {
+        document.getElementById('btn-dock-dashboard').classList.add('active');
+        if (map) {
+          setTimeout(function() { map.invalidateSize(); }, 200);
+        }
+      } else if (viewId === 'view-apps') {
+        document.getElementById('btn-dock-apps').classList.add('active');
+      }
+    }
+
+    document.getElementById('btn-dock-dashboard').addEventListener('click', function() {
+      switchView('view-dashboard');
+    });
+
+    document.getElementById('btn-dock-map').addEventListener('click', function() {
+      switchView('view-dashboard');
+      followUser = true;
+      if (userLat && userLng && map) map.setView([userLat, userLng], 17);
+    });
+
+    document.getElementById('btn-dock-music').addEventListener('click', function() {
+      btnPlay.click();
+    });
+
+    document.getElementById('btn-dock-apps').addEventListener('click', function() {
+      switchView('view-apps');
+    });
+
+    document.getElementById('btn-dock-home').addEventListener('click', function() {
+      switchView('view-dashboard');
+    });
+
+    document.getElementById('app-item-dashboard').addEventListener('click', function() {
+      switchView('view-dashboard');
+    });
+
+    // STARTUP
+    window.addEventListener('DOMContentLoaded', function() {
+      initMap();
+      initGeolocation();
+      loadStation(0);
+    });
+  </script>
+</body>
+</html>
